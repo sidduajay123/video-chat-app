@@ -173,7 +173,7 @@ resource "aws_eks_cluster" "video_chat_cluster" {
   compute_config {
     enabled       = true
     node_pools    = ["general-purpose", "system"]
-    node_role_arn = aws_iam_role.eks_node_role.arn
+    node_role_arn = data.aws_iam_role.eks_node_role.arn
   }
 
   storage_config {
