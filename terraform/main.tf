@@ -30,64 +30,9 @@ data "aws_subnets" "default" {
 }
 
 # ─── Security Groups ──────────────────────────────────────────────────────────
-resource "aws_security_group" "eks_node_sg" {
-  name        = "video-chat-node-sg"
-  description = "Security group for EKS worker nodes and load balancer access"
-  vpc_id      = data.aws_vpc.default.id
-
-  ingress {
-    description = "NodePort range"
-    from_port   = 30000
-    to_port     = 32767
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    description = "Application Port 3000"
-    from_port   = 3000
-    to_port     = 3000
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    description = "HTTP"
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    description = "HTTPS"
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    description = "Node-to-node internal communication"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    self        = true
-  }
-
-  egress {
-    description = "Allow all outbound"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = {
-    Name                                        = "video-chat-node-sg"
-    Environment                                 = var.environment
-    "kubernetes.io/cluster/${var.cluster_name}" = "owned"
-  }
+data "aws_security_group" "eks_node_sg" {
+  name   = "video-chat-node-sg"
+  vpc_id = data.aws_vpc.default.id
 }
 
 # ─── IAM Roles for EKS ─────────────────────────────────────────────────────────
@@ -111,7 +56,7 @@ resource "aws_eks_cluster" "video_chat_cluster" {
 
   vpc_config {
     subnet_ids              = data.aws_subnets.default.ids
-    security_group_ids      = [aws_security_group.eks_node_sg.id]
+    security_group_ids      = [data.aws_security_group.eks_node_sg.id]
     endpoint_public_access  = true
     endpoint_private_access = true
   }
