@@ -200,10 +200,19 @@ describe('Socket.IO: Messaging', () => {
       roomId = data.roomId;
       matchCount++;
       if (matchCount === 2) {
-        male.emit('send-message', { roomId, text: 'Hello!', timestamp: Date.now() });
+        setTimeout(() => {
+          male.emit('send-message', { roomId, text: 'Hello!', timestamp: Date.now() });
+        }, 100);
       }
     });
-    female.on('matched', () => { matchCount++; });
+    female.on('matched', (data) => {
+      matchCount++;
+      if (matchCount === 2) {
+        setTimeout(() => {
+          male.emit('send-message', { roomId, text: 'Hello!', timestamp: Date.now() });
+        }, 100);
+      }
+    });
 
     female.on('receive-message', (msg) => {
       expect(msg.text).toBe('Hello!');
