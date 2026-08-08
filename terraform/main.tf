@@ -239,7 +239,7 @@ resource "aws_eks_cluster" "video_chat_cluster" {
 # ─── EKS Node Group ───────────────────────────────────────────────────────────
 resource "aws_eks_node_group" "video_chat_nodes" {
   cluster_name    = aws_eks_cluster.video_chat_cluster.name
-  nodegroup_name  = "video-chat-nodes"
+  node_group_name = "video-chat-nodes"
   node_role_arn   = aws_iam_role.eks_node_role.arn
   subnet_ids      = aws_subnet.public_subnets[*].id
   instance_types  = [var.node_instance_type]
