@@ -6,7 +6,21 @@ const SocketService = (() => {
   let handlers = {};
 
   function connect() {
-    socket = io({ transports: ['websocket', 'polling'] });
+    socket = io({
+      transports: ['polling', 'websocket'],
+      reconnection: true,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
+      timeout: 20000
+    });
+
+    // Handle BFCache (Back-Forward cache) page restoration
+    window.addEventListener('pageshow', (event) => {
+      if (event.persisted && socket) {
+        console.log('[Socket] Page restored from BFCache, reconnecting...');
+        socket.connect();
+      }
+    });
 
     socket.on('connect', () => {
       console.log('[Socket] Connected:', socket.id);

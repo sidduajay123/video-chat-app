@@ -17,7 +17,7 @@ const io = new Server(server, {
     origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : '*',
     methods: ['GET', 'POST']
   },
-  transports: ['websocket', 'polling']
+  transports: ['polling', 'websocket']
 });
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
@@ -38,6 +38,9 @@ app.use(helmet({
 }));
 app.use(cors());
 app.use(express.json());
+
+// Handle favicon cleanly to prevent 404 / ERR_EMPTY_RESPONSE console errors
+app.get('/favicon.ico', (req, res) => res.status(204).end());
 
 // Rate limiter on API routes
 const apiLimiter = rateLimit({
