@@ -57,13 +57,11 @@ jobs:
         ECR_REPOSITORY: video-chat-app
         IMAGE_TAG: ${{ github.sha }}
       run: |
-        if aws eks update-kubeconfig --name video-chat-cluster --region us-east-1 2>/dev/null; then
-          sed -i "s|sidduajay123/video-chat-app:latest|$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG|g" k8s/deployment.yaml
-          kubectl apply -f k8s/deployment.yaml || true
-          kubectl rollout restart deployment/video-chat-app -n video-chat || true
-        else
-          echo "EKS cluster is initializing via Terraform..."
-        fi
+        aws eks update-kubeconfig --name video-chat-cluster --region us-east-1
+        sed -i "s|sidduajay123/video-chat-app:latest|$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG|g" k8s/deployment.yaml
+        kubectl apply -f k8s/deployment.yaml
+        kubectl rollout restart deployment/video-chat-app -n video-chat
+        kubectl rollout status deployment/video-chat-app -n video-chat --timeout=180s
 
     - name: Dynamically Register EKS Nodes with Load Balancer
       run: |

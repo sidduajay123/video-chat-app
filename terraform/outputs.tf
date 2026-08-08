@@ -23,10 +23,7 @@ output "ecr_repository_url" {
   description = "URL of the Amazon ECR Docker repository"
 }
 
-output "elb_dns_name" {
-  value       = try(kubernetes_service.video_chat_service.status[0].load_balancer[0].ingress[0].hostname, "pending")
-  description = "DNS name of the AWS Load Balancer"
-}
+
 
 output "security_group_id" {
   value       = data.aws_security_group.eks_node_sg.id
