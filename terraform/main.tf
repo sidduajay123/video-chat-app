@@ -238,7 +238,7 @@ resource "aws_eks_cluster" "video_chat_cluster" {
     }
   }
 
-  kubernetes_networking_config {
+  kubernetes_network_config {
     elastic_load_balancing {
       enabled = true
     }
