@@ -18,74 +18,23 @@ provider "aws" {
 }
 
 # ─── Data Sources ──────────────────────────────────────────────────────────────
-data "aws_availability_zones" "available" {
-  state = "available"
+data "aws_vpc" "default" {
+  default = true
 }
 
-# ─── VPC & Networking ─────────────────────────────────────────────────────────
-resource "aws_vpc" "video_chat_vpc" {
-  cidr_block           = "10.0.0.0/16"
-  enable_dns_hostnames = true
-  enable_dns_support   = true
-
-  tags = {
-    Name                                        = "video-chat-vpc"
-    Environment                                 = var.environment
-    "kubernetes.io/cluster/${var.cluster_name}" = "shared"
+data "aws_subnets" "default" {
+  filter {
+    name   = "vpc-id"
+    values = [data.aws_vpc.default.id]
   }
-}
-
-resource "aws_internet_gateway" "igw" {
-  vpc_id = aws_vpc.video_chat_vpc.id
-
-  tags = {
-    Name        = "video-chat-igw"
-    Environment = var.environment
-  }
-}
-
-resource "aws_subnet" "public_subnets" {
-  count                   = 3
-  vpc_id                  = aws_vpc.video_chat_vpc.id
-  cidr_block              = "10.0.${count.index + 1}.0/24"
-  availability_zone       = data.aws_availability_zones.available.names[count.index]
-  map_public_ip_on_launch = true
-
-  tags = {
-    Name                                        = "video-chat-public-subnet-${count.index + 1}"
-    Environment                                 = var.environment
-    "kubernetes.io/cluster/${var.cluster_name}" = "shared"
-    "kubernetes.io/role/elb"                    = "1"
-  }
-}
-
-resource "aws_route_table" "public_rt" {
-  vpc_id = aws_vpc.video_chat_vpc.id
-
-  route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.igw.id
-  }
-
-  tags = {
-    Name        = "video-chat-public-rt"
-    Environment = var.environment
-  }
-}
-
-resource "aws_route_table_association" "public" {
-  count          = length(aws_subnet.public_subnets)
-  subnet_id      = aws_subnet.public_subnets[count.index].id
-  route_table_id = aws_route_table.public_rt.id
 }
 
 # ─── Security Groups ──────────────────────────────────────────────────────────
 resource "aws_security_group" "eks_node_sg" {
   name        = "video-chat-node-sg"
   description = "Security group for EKS worker nodes and load balancer access"
-  vpc_id      = aws_vpc.video_chat_vpc.id
+  vpc_id      = data.aws_vpc.default.id
 
-  # Allow NodePort traffic (Kubernetes services & load balancers)
   ingress {
     description = "NodePort range"
     from_port   = 30000
@@ -94,7 +43,6 @@ resource "aws_security_group" "eks_node_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # Allow direct app port
   ingress {
     description = "Application Port 3000"
     from_port   = 3000
@@ -103,7 +51,6 @@ resource "aws_security_group" "eks_node_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # HTTP & HTTPS
   ingress {
     description = "HTTP"
     from_port   = 80
@@ -120,7 +67,6 @@ resource "aws_security_group" "eks_node_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # Allow all internal node-to-node communication
   ingress {
     description = "Node-to-node internal communication"
     from_port   = 0
@@ -164,7 +110,7 @@ resource "aws_eks_cluster" "video_chat_cluster" {
   role_arn = data.aws_iam_role.eks_cluster_role.arn
 
   vpc_config {
-    subnet_ids              = aws_subnet.public_subnets[*].id
+    subnet_ids              = data.aws_subnets.default.ids
     security_group_ids      = [aws_security_group.eks_node_sg.id]
     endpoint_public_access  = true
     endpoint_private_access = true
@@ -181,7 +127,7 @@ resource "aws_eks_node_group" "video_chat_nodes" {
   cluster_name    = aws_eks_cluster.video_chat_cluster.name
   node_group_name = "video-chat-nodes"
   node_role_arn   = data.aws_iam_role.eks_node_role.arn
-  subnet_ids      = aws_subnet.public_subnets[*].id
+  subnet_ids      = data.aws_subnets.default.ids
   instance_types  = [var.node_instance_type]
   capacity_type   = "ON_DEMAND"
   ami_type        = "AL2023_x86_64_STANDARD"

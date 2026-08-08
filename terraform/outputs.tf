@@ -1,11 +1,11 @@
 output "vpc_id" {
-  value       = aws_vpc.video_chat_vpc.id
-  description = "The ID of the created VPC"
+  value       = data.aws_vpc.default.id
+  description = "The ID of the VPC"
 }
 
 output "public_subnets" {
-  value       = aws_subnet.public_subnets[*].id
-  description = "IDs of the public subnets"
+  value       = data.aws_subnets.default.ids
+  description = "IDs of the subnets"
 }
 
 output "eks_cluster_name" {
