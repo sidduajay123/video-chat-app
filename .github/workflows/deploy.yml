@@ -73,12 +73,12 @@ jobs:
 
     - name: Automatically Register EKS Nodes with Load Balancer & Verify Health
       run: |
-        NODE_IDS=$(kubectl get nodes -o jsonpath='{.items[*].metadata.name}')
-        echo "Active EKS Nodes: $NODE_IDS"
-        if [ -n "$NODE_IDS" ]; then
+        NODES=$(kubectl get nodes -o jsonpath='{.items[*].metadata.name}')
+        echo "Active EKS Nodes: $NODES"
+        if [ -n "$NODES" ]; then
           aws elb register-instances-with-load-balancer \
             --load-balancer-name a3d93899534b241b981160b247d1704f \
-            --instances $NODE_IDS \
+            --instances $NODES \
             --region us-east-1
           
           echo "Waiting 15s for ELB health check..."
