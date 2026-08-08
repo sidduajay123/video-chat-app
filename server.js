@@ -24,11 +24,13 @@ const io = new Server(server, {
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "cdn.socket.io"],
-      connectSrc: ["'self'", "wss:", "ws:", "https://nominatim.openstreetmap.org"],
-      mediaSrc: ["'self'", "blob:"],
-      imgSrc: ["'self'", "data:", "blob:"],
+      defaultSrc: ["'self'", "http:", "https:"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "cdn.socket.io"],
+      connectSrc: ["'self'", "wss:", "ws:", "https://nominatim.openstreetmap.org", "http:", "https:"],
+      mediaSrc: ["'self'", "blob:", "http:", "https:"],
+      imgSrc: ["'self'", "data:", "blob:", "http:", "https:"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"]
     }
   }
 }));
