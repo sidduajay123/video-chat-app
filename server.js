@@ -70,7 +70,7 @@ io.on('connection', (socket) => {
   console.log(`[+] Connected: ${socket.id}`);
 
   // ── Join Queue ──────────────────────────────────────────────────────────────
-  socket.on('join-queue', ({ gender, mode, location }) => {
+  socket.on('join-queue', ({ gender, mode, location, avatar }) => {
     // Rate limit: max 1 join per 2 seconds
     const lastJoin = joinRateLimitMap.get(socket.id) || 0;
     const now = Date.now();
@@ -80,7 +80,8 @@ io.on('connection', (socket) => {
     }
     joinRateLimitMap.set(socket.id, now);
 
-    const result = matchmaker.enqueue(socket.id, gender, mode, location);
+    const userAvatar = avatar || '👤';
+    const result = matchmaker.enqueue(socket.id, gender, mode, { ...location, avatar: userAvatar });
     if (!result) {
       socket.emit('error', { message: 'Invalid gender or mode.' });
       return;
@@ -93,6 +94,7 @@ io.on('connection', (socket) => {
       io.to(caller).emit('matched', {
         roomId,
         peerLocation: calleeLocation,
+        peerAvatar: calleeLocation.avatar || '👤',
         isCaller: true,
         mode: matchMode
       });
@@ -101,6 +103,7 @@ io.on('connection', (socket) => {
       io.to(callee).emit('matched', {
         roomId,
         peerLocation: callerLocation,
+        peerAvatar: callerLocation.avatar || '👤',
         isCaller: false,
         mode: matchMode
       });
