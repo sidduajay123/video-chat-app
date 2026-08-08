@@ -1,0 +1,9 @@
+aws_region          = "us-east-1"
+cluster_name        = "video-chat-cluster"
+environment         = "production"
+domain_name         = "omeglefun.work.gd"
+node_instance_type  = "t3.small"
+node_desired_size   = 1
+node_min_size       = 1
+node_max_size       = 2
+acm_certificate_arn = "arn:aws:acm:us-east-1:181137999309:certificate/1fcecdcb-fd6b-4876-b48f-0ba535310324"
