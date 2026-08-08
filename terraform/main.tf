@@ -287,44 +287,4 @@ resource "aws_eks_node_group" "video_chat_nodes" {
   }
 }
 
-# ─── AWS Classic Load Balancer (ELB) ─────────────────────────────────────────
-resource "aws_elb" "video_chat_elb" {
-  name            = "a3d93899534b241b981160b247d1704f"
-  subnets         = aws_subnet.public_subnets[*].id
-  security_groups = [aws_security_group.eks_node_sg.id]
 
-  # HTTPS Listener (Port 443 → HTTP NodePort)
-  listener {
-    instance_port      = 32682
-    instance_protocol  = "HTTP"
-    lb_port            = 443
-    lb_protocol        = "HTTPS"
-    ssl_certificate_id = var.acm_certificate_arn
-  }
-
-  # HTTP Listener (Port 80 → HTTP NodePort)
-  listener {
-    instance_port     = 32014
-    instance_protocol = "HTTP"
-    lb_port           = 80
-    lb_protocol       = "HTTP"
-  }
-
-  health_check {
-    healthy_threshold   = 2
-    unhealthy_threshold = 6
-    timeout             = 5
-    target              = "TCP:32014"
-    interval            = 10
-  }
-
-  cross_zone_load_balancing   = true
-  idle_timeout                = 3600
-  connection_draining         = true
-  connection_draining_timeout = 300
-
-  tags = {
-    Name        = "video-chat-elb"
-    Environment = var.environment
-  }
-}

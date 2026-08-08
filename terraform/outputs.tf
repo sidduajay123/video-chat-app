@@ -24,7 +24,7 @@ output "ecr_repository_url" {
 }
 
 output "elb_dns_name" {
-  value       = aws_elb.video_chat_elb.dns_name
+  value       = try(kubernetes_service.video_chat_service.status[0].load_balancer[0].ingress[0].hostname, "pending")
   description = "DNS name of the AWS Load Balancer"
 }
 
