@@ -17,6 +17,11 @@ resource "kubernetes_namespace" "video_chat" {
       app = "video-chat-app"
     }
   }
+
+  depends_on = [
+    aws_eks_cluster.video_chat_cluster,
+    aws_eks_node_group.video_chat_nodes
+  ]
 }
 
 # ─── ConfigMap ────────────────────────────────────────────────────────────────
