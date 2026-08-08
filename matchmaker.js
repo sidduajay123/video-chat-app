@@ -1,0 +1,156 @@
+// matchmaker.js — Gender-based queue and room matching logic
+
+const { v4: uuidv4 } = require('uuid');
+
+class Matchmaker {
+  constructor() {
+    // Separate queues per mode per gender
+    this.queues = {
+      video: { male: [], female: [] },
+      text:  { male: [], female: [] }
+    };
+    this.rooms = new Map(); // roomId -> { peerA, peerB, mode }
+    this.socketToRoom = new Map(); // socketId -> roomId
+  }
+
+  /**
+   * Add a user to the appropriate queue and attempt matching
+   * @param {string} socketId
+   * @param {string} gender - 'male' | 'female'
+   * @param {string} mode   - 'video' | 'text'
+   * @param {object} location - { city, country, flag }
+   * @returns {object|null} match result or null if queued
+   */
+  enqueue(socketId, gender, mode, location) {
+    if (!['male', 'female'].includes(gender)) return null;
+    if (!['video', 'text'].includes(mode)) return null;
+
+    const oppositeGender = gender === 'male' ? 'female' : 'male';
+    const oppositeQueue = this.queues[mode][oppositeGender];
+
+    // Remove any stale entry for this socket first
+    this.removeFromQueues(socketId);
+
+    // Check if an opposite gender user is waiting
+    if (oppositeQueue.length > 0) {
+      const peer = oppositeQueue.shift();
+      const roomId = uuidv4();
+
+      const room = {
+        roomId,
+        peerA: { socketId, gender, location },
+        peerB: { socketId: peer.socketId, gender: peer.gender, location: peer.location },
+        mode,
+        createdAt: Date.now()
+      };
+
+      this.rooms.set(roomId, room);
+      this.socketToRoom.set(socketId, roomId);
+      this.socketToRoom.set(peer.socketId, roomId);
+
+      return {
+        matched: true,
+        roomId,
+        caller: socketId,       // This socket initiates WebRTC offer
+        callee: peer.socketId,
+        callerLocation: location,
+        calleeLocation: peer.location,
+        mode
+      };
+    }
+
+    // No match yet — add to queue
+    this.queues[mode][gender].push({ socketId, gender, location, joinedAt: Date.now() });
+    return { matched: false, queued: true };
+  }
+
+  /**
+   * Get the peer's socket ID for a given socket in a room
+   */
+  getPeer(socketId) {
+    const roomId = this.socketToRoom.get(socketId);
+    if (!roomId) return null;
+    const room = this.rooms.get(roomId);
+    if (!room) return null;
+    if (room.peerA.socketId === socketId) return { socketId: room.peerB.socketId, roomId };
+    if (room.peerB.socketId === socketId) return { socketId: room.peerA.socketId, roomId };
+    return null;
+  }
+
+  /**
+   * Remove a socket from all queues
+   */
+  removeFromQueues(socketId) {
+    for (const mode of ['video', 'text']) {
+      for (const gender of ['male', 'female']) {
+        this.queues[mode][gender] = this.queues[mode][gender].filter(
+          u => u.socketId !== socketId
+        );
+      }
+    }
+  }
+
+  /**
+   * Disconnect a socket from its room, return peer socketId
+   */
+  disconnect(socketId) {
+    this.removeFromQueues(socketId);
+    const roomId = this.socketToRoom.get(socketId);
+    if (!roomId) return null;
+
+    const room = this.rooms.get(roomId);
+    this.rooms.delete(roomId);
+    this.socketToRoom.delete(socketId);
+
+    if (!room) return null;
+
+    let peerSocketId = null;
+    if (room.peerA.socketId === socketId) {
+      peerSocketId = room.peerB.socketId;
+    } else if (room.peerB.socketId === socketId) {
+      peerSocketId = room.peerA.socketId;
+    }
+
+    if (peerSocketId) {
+      this.socketToRoom.delete(peerSocketId);
+    }
+
+    return peerSocketId;
+  }
+
+  /**
+   * Get queue stats (for monitoring/health checks)
+   */
+  getStats() {
+    return {
+      queues: {
+        video: {
+          male: this.queues.video.male.length,
+          female: this.queues.video.female.length
+        },
+        text: {
+          male: this.queues.text.male.length,
+          female: this.queues.text.female.length
+        }
+      },
+      activeRooms: this.rooms.size,
+      connectedPairs: this.rooms.size
+    };
+  }
+
+  /**
+   * Get room by ID
+   */
+  getRoom(roomId) {
+    return this.rooms.get(roomId) || null;
+  }
+
+  /**
+   * Get all active room IDs
+   */
+  getRoomIds() {
+    return Array.from(this.rooms.keys());
+  }
+}
+
+module.exports = Matchmaker;
