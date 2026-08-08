@@ -29,7 +29,7 @@ metadata:
     app: video-chat-app
     version: "1.0.0"
 spec:
-  replicas: 3
+  replicas: 1
   selector:
     matchLabels:
       app: video-chat-app
@@ -188,8 +188,8 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: video-chat-app
-  minReplicas: 2
-  maxReplicas: 10
+  minReplicas: 1
+  maxReplicas: 1
   metrics:
     - type: Resource
       resource:
