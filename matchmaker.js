@@ -27,41 +27,54 @@ class Matchmaker {
 
     const oppositeGender = gender === 'male' ? 'female' : 'male';
     const oppositeQueue = this.queues[mode][oppositeGender];
+    const sameQueue = this.queues[mode][gender];
 
     // Remove any stale entry for this socket first
     this.removeFromQueues(socketId);
 
-    // Check if an opposite gender user is waiting
+    // 1. Try to match with opposite gender first
     if (oppositeQueue.length > 0) {
       const peer = oppositeQueue.shift();
-      const roomId = uuidv4();
+      return this.createMatchedRoom(socketId, gender, location, peer.socketId, peer.gender, peer.location, mode);
+    }
 
-      const room = {
-        roomId,
-        peerA: { socketId, gender, location },
-        peerB: { socketId: peer.socketId, gender: peer.gender, location: peer.location },
-        mode,
-        createdAt: Date.now()
-      };
-
-      this.rooms.set(roomId, room);
-      this.socketToRoom.set(socketId, roomId);
-      this.socketToRoom.set(peer.socketId, roomId);
-
-      return {
-        matched: true,
-        roomId,
-        caller: socketId,       // This socket initiates WebRTC offer
-        callee: peer.socketId,
-        callerLocation: location,
-        calleeLocation: peer.location,
-        mode
-      };
+    // 2. Fall back to matching with same gender
+    if (sameQueue.length > 0) {
+      const peer = sameQueue.shift();
+      return this.createMatchedRoom(socketId, gender, location, peer.socketId, peer.gender, peer.location, mode);
     }
 
     // No match yet — add to queue
     this.queues[mode][gender].push({ socketId, gender, location, joinedAt: Date.now() });
     return { matched: false, queued: true };
+  }
+
+  /**
+   * Helper to instantiate a matched room pair
+   */
+  createMatchedRoom(socketIdA, genderA, locationA, socketIdB, genderB, locationB, mode) {
+    const roomId = uuidv4();
+    const room = {
+      roomId,
+      peerA: { socketId: socketIdA, gender: genderA, location: locationA },
+      peerB: { socketId: socketIdB, gender: genderB, location: locationB },
+      mode,
+      createdAt: Date.now()
+    };
+
+    this.rooms.set(roomId, room);
+    this.socketToRoom.set(socketIdA, roomId);
+    this.socketToRoom.set(socketIdB, roomId);
+
+    return {
+      matched: true,
+      roomId,
+      caller: socketIdA,       // A initiates WebRTC offer
+      callee: socketIdB,
+      callerLocation: locationA,
+      calleeLocation: locationB,
+      mode
+    };
   }
 
   /**
