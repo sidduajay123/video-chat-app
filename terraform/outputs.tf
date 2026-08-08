@@ -19,7 +19,7 @@ output "eks_cluster_endpoint" {
 }
 
 output "ecr_repository_url" {
-  value       = aws_ecr_repository.app_repo.repository_url
+  value       = data.aws_ecr_repository.app_repo.repository_url
   description = "URL of the Amazon ECR Docker repository"
 }
 
