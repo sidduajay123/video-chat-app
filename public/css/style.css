@@ -189,6 +189,24 @@ body {
 }
 .gender-card:hover .gender-emoji { transform: scale(1.15); }
 
+/* ── Avatar Selection ────────────────────────────────────── */
+.avatar-select-container {
+  display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; max-width: 420px;
+}
+.avatar-option {
+  width: 48px; height: 48px; border-radius: 50%; background: var(--surface);
+  border: 1px solid var(--border); font-size: 1.6rem; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: var(--transition);
+}
+.avatar-option:hover {
+  transform: scale(1.15); border-color: var(--purple);
+}
+.avatar-option.active {
+  background: var(--purple); border-color: var(--purple-light);
+  box-shadow: var(--glow-purple); transform: scale(1.15);
+}
+
 /* ══════════════════════════════════════════════════════════
    PERMISSION SCREEN
    ══════════════════════════════════════════════════════════ */
