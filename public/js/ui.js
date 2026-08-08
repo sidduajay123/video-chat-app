@@ -65,6 +65,19 @@ const UI = (() => {
   }
 
   /**
+   * Set user selected avatars in the badges / headings
+   */
+  function setAvatars(selfAvatar, peerAvatar) {
+    const selfVidBadge = document.getElementById('self-avatar-badge');
+    const peerVidBadge = document.getElementById('peer-avatar-badge');
+    const peerTextAvatar = document.getElementById('text-peer-avatar');
+
+    if (selfVidBadge) selfVidBadge.textContent = selfAvatar || '👤';
+    if (peerVidBadge) peerVidBadge.textContent = peerAvatar || '👤';
+    if (peerTextAvatar) peerTextAvatar.textContent = peerAvatar || '👤';
+  }
+
+  /**
    * Show/hide connecting overlay
    */
   function setConnecting(visible) {
@@ -193,7 +206,7 @@ const UI = (() => {
 
   return {
     init, showScreen,
-    appendMessage, setLocationBadge, setTextLocation,
+    appendMessage, setLocationBadge, setTextLocation, setAvatars,
     setConnecting, showToast, setPermStatus,
     startCountdown, setSearchingInfo, toggleSidebar,
     clearMessages, clearInput,
