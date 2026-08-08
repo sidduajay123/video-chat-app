@@ -26,6 +26,6 @@ output "ecr_repository_url" {
 
 
 output "security_group_id" {
-  value       = data.aws_security_group.eks_node_sg.id
+  value       = aws_security_group.eks_node_sg.id
   description = "Security Group ID for EKS nodes"
 }
