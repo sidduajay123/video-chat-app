@@ -23,6 +23,7 @@ const io = new Server(server, {
 // ─── Middleware ───────────────────────────────────────────────────────────────
 app.use(helmet({
   contentSecurityPolicy: {
+    useDefaults: true,
     directives: {
       defaultSrc: ["'self'", "http:", "https:"],
       scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "cdn.socket.io"],
@@ -30,7 +31,8 @@ app.use(helmet({
       mediaSrc: ["'self'", "blob:", "http:", "https:"],
       imgSrc: ["'self'", "data:", "blob:", "http:", "https:"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-      fontSrc: ["'self'", "https://fonts.gstatic.com"]
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      upgradeInsecureRequests: null // Disable forcing HTTPS upgrades
     }
   }
 }));
