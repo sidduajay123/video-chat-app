@@ -7,7 +7,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install all deps (including devDeps for build)
-RUN npm ci --only=production
+RUN npm install --omit=dev
 
 # ─── Stage 2: Production ─────────────────────────────────────────────────────
 FROM node:24-alpine AS production
