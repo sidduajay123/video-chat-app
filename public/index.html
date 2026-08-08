@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ConnectNow — Meet Someone New</title>
+  <meta name="description" content="Anonymous one-on-one video and text chat. Connect with random strangers instantly." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+
+  <!-- ═══════════════ SCREEN 1: HOME ═══════════════ -->
+  <div id="screen-home" class="screen active">
+    <div class="bg-orbs">
+      <div class="orb orb-1"></div>
+      <div class="orb orb-2"></div>
+      <div class="orb orb-3"></div>
+    </div>
+    <div class="home-content">
+      <div class="logo-wrap">
+        <div class="logo-icon">⚡</div>
+        <h1 class="logo-text">ConnectNow</h1>
+      </div>
+      <p class="tagline">Meet someone new. Right now. Anonymously.</p>
+      <div class="mode-cards">
+        <button class="mode-card" id="btn-video-mode" aria-label="Start Video Chat">
+          <div class="mode-icon">📹</div>
+          <div class="mode-label">Video Chat</div>
+          <div class="mode-desc">Face-to-face with location</div>
+          <div class="mode-glow"></div>
+        </button>
+        <button class="mode-card" id="btn-text-mode" aria-label="Start Text Chat">
+          <div class="mode-icon">💬</div>
+          <div class="mode-label">Text Chat</div>
+          <div class="mode-desc">Anonymous messaging</div>
+          <div class="mode-glow"></div>
+        </button>
+      </div>
+      <p class="terms">By continuing you agree to be respectful. Be kind.</p>
+    </div>
+  </div>
+
+  <!-- ═══════════════ SCREEN 2: GENDER ═══════════════ -->
+  <div id="screen-gender" class="screen">
+    <div class="bg-orbs">
+      <div class="orb orb-1"></div>
+      <div class="orb orb-2"></div>
+    </div>
+    <div class="gender-content">
+      <button class="back-btn" id="btn-gender-back" aria-label="Go back">← Back</button>
+      <h2 class="screen-title">I am...</h2>
+      <p class="screen-sub">You'll be matched with the opposite gender</p>
+      <div class="gender-cards">
+        <button class="gender-card" id="btn-male" aria-label="Select Male">
+          <div class="gender-emoji">👨</div>
+          <div class="gender-label">Male</div>
+        </button>
+        <button class="gender-card" id="btn-female" aria-label="Select Female">
+          <div class="gender-emoji">👩</div>
+          <div class="gender-label">Female</div>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ SCREEN 3: PERMISSION (Video only) ═══════════════ -->
+  <div id="screen-permission" class="screen">
+    <div class="bg-orbs">
+      <div class="orb orb-2"></div>
+    </div>
+    <div class="permission-content">
+      <div class="perm-icon" id="perm-icon">🎥</div>
+      <h2 class="screen-title" id="perm-title">Requesting Access</h2>
+      <p class="screen-sub" id="perm-sub">Please allow camera & microphone access to start video chat</p>
+      <div class="perm-steps">
+        <div class="perm-step" id="perm-step-location">
+          <span class="step-icon">📍</span>
+          <span class="step-text">Location</span>
+          <span class="step-status" id="status-location">⏳</span>
+        </div>
+        <div class="perm-step" id="perm-step-camera">
+          <span class="step-icon">🎥</span>
+          <span class="step-text">Camera & Mic</span>
+          <span class="step-status" id="status-camera">⏳</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ SCREEN 4: PERMISSION DENIED ═══════════════ -->
+  <div id="screen-denied" class="screen">
+    <div class="denied-content">
+      <div class="denied-icon">🚫</div>
+      <h2 class="screen-title">Camera Access Required</h2>
+      <p class="screen-sub">Camera & microphone access is required for video chat.<br/>Please allow access in your browser settings.</p>
+      <div class="redirect-bar">
+        <span>Redirecting to home in </span>
+        <span id="redirect-countdown" class="countdown">3</span>
+        <span>s...</span>
+      </div>
+      <button class="btn-primary" id="btn-denied-home">Go Home Now</button>
+    </div>
+  </div>
+
+  <!-- ═══════════════ SCREEN 5: SEARCHING ═══════════════ -->
+  <div id="screen-searching" class="screen">
+    <div class="bg-orbs">
+      <div class="orb orb-1"></div>
+      <div class="orb orb-3"></div>
+    </div>
+    <div class="searching-content">
+      <div class="pulse-rings">
+        <div class="ring ring-1"></div>
+        <div class="ring ring-2"></div>
+        <div class="ring ring-3"></div>
+        <div class="search-center">⚡</div>
+      </div>
+      <h2 class="screen-title">Finding your match...</h2>
+      <p class="screen-sub" id="searching-info"></p>
+      <div class="searching-tags" id="searching-tags"></div>
+      <button class="btn-outline" id="btn-cancel-search">Cancel</button>
+    </div>
+  </div>
+
+  <!-- ═══════════════ SCREEN 6: VIDEO CHAT ═══════════════ -->
+  <div id="screen-video" class="screen">
+    <div class="video-layout">
+      <!-- Remote video (main) -->
+      <div class="video-main">
+        <video id="remote-video" autoplay playsinline></video>
+        <div class="video-overlay">
+          <div class="location-badge peer-badge" id="peer-location-badge">
+            <span id="peer-flag"></span>
+            <span id="peer-city"></span>
+          </div>
+          <div class="connecting-overlay" id="connecting-overlay">
+            <div class="connecting-spinner"></div>
+            <p>Connecting...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Local video (PiP) -->
+      <div class="video-pip">
+        <video id="local-video" autoplay playsinline muted></video>
+        <div class="location-badge self-badge" id="self-location-badge">
+          <span id="self-flag"></span>
+          <span id="self-city"></span>
+        </div>
+      </div>
+
+      <!-- Chat sidebar -->
+      <div class="chat-sidebar" id="chat-sidebar">
+        <div class="chat-header">
+          <span>💬 Chat</span>
+          <button class="sidebar-toggle" id="btn-toggle-sidebar" aria-label="Toggle chat">✕</button>
+        </div>
+        <div class="chat-messages" id="video-chat-messages"></div>
+        <div class="chat-input-wrap">
+          <input type="text" id="video-chat-input" class="chat-input" placeholder="Type a message..." maxlength="500" aria-label="Chat message" />
+          <button class="btn-send" id="btn-video-send" aria-label="Send message">➤</button>
+        </div>
+      </div>
+
+      <!-- Controls -->
+      <div class="video-controls">
+        <button class="ctrl-btn" id="btn-toggle-mic" aria-label="Toggle microphone" title="Mute/Unmute">🎤</button>
+        <button class="ctrl-btn" id="btn-toggle-cam" aria-label="Toggle camera" title="Camera On/Off">📷</button>
+        <button class="ctrl-btn chat-toggle-btn" id="btn-show-chat" aria-label="Show chat">💬</button>
+        <button class="ctrl-btn next-btn" id="btn-video-next" aria-label="Next stranger">⏭ Next</button>
+        <button class="ctrl-btn end-btn" id="btn-video-end" aria-label="End chat">✕ End</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ SCREEN 7: TEXT CHAT ═══════════════ -->
+  <div id="screen-text" class="screen">
+    <div class="text-chat-layout">
+      <div class="text-chat-header">
+        <div class="chat-peer-info">
+          <div class="peer-avatar">👤</div>
+          <div class="peer-details">
+            <span class="peer-name">Stranger</span>
+            <span class="peer-location-text" id="text-peer-location">📍 Unknown Location</span>
+          </div>
+        </div>
+        <div class="chat-header-actions">
+          <span class="self-location-text" id="text-self-location">📍 Your location</span>
+          <button class="ctrl-btn next-btn" id="btn-text-next" aria-label="Next stranger">⏭ Next</button>
+          <button class="ctrl-btn end-btn" id="btn-text-end" aria-label="End chat">✕ End</button>
+        </div>
+      </div>
+      <div class="text-messages" id="text-chat-messages">
+        <div class="chat-welcome">
+          <span>👋</span>
+          <p>Say hello to your match!</p>
+        </div>
+      </div>
+      <div class="text-input-bar">
+        <input type="text" id="text-chat-input" class="chat-input" placeholder="Type a message... (max 500 chars)" maxlength="500" aria-label="Text chat message" />
+        <button class="btn-send" id="btn-text-send" aria-label="Send">➤</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ PEER LEFT TOAST ═══════════════ -->
+  <div class="toast" id="toast" role="alert" aria-live="polite"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/location.js"></script>
+  <script src="/js/webrtc.js"></script>
+  <script src="/js/socket.js"></script>
+  <script src="/js/ui.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>
