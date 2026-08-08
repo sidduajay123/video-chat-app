@@ -26,11 +26,12 @@ class Matchmaker {
     if (!['video', 'text'].includes(mode)) return null;
 
     const oppositeGender = gender === 'male' ? 'female' : 'male';
-    const oppositeQueue = this.queues[mode][oppositeGender];
-    const sameQueue = this.queues[mode][gender];
 
     // Remove any stale entry for this socket first
     this.removeFromQueues(socketId);
+
+    const oppositeQueue = this.queues[mode][oppositeGender];
+    const sameQueue = this.queues[mode][gender].filter(u => u.socketId !== socketId);
 
     // 1. Try to match with opposite gender first
     if (oppositeQueue.length > 0) {
@@ -41,6 +42,8 @@ class Matchmaker {
     // 2. Fall back to matching with same gender
     if (sameQueue.length > 0) {
       const peer = sameQueue.shift();
+      // Remove matched peer from the real queue
+      this.queues[mode][gender] = this.queues[mode][gender].filter(u => u.socketId !== peer.socketId);
       return this.createMatchedRoom(socketId, gender, location, peer.socketId, peer.gender, peer.location, mode);
     }
 
