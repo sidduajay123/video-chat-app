@@ -6,6 +6,7 @@ const App = (() => {
     mode: null,        // 'video' | 'text'
     gender: null,      // 'male' | 'female'
     location: null,    // { city, country, flag }
+    avatar: '🐱',      // Selected avatar (default)
     localStream: null,
     isMicOn: true,
     isCamOn: true,
@@ -43,6 +44,16 @@ const App = (() => {
     // Gender selection
     document.getElementById('btn-male').addEventListener('click', () => handleGenderSelect('male'));
     document.getElementById('btn-female').addEventListener('click', () => handleGenderSelect('female'));
+
+    // Avatar selection clicks
+    const avatarOpts = document.querySelectorAll('.avatar-option');
+    avatarOpts.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        avatarOpts.forEach(b => b.classList.remove('active'));
+        e.target.classList.add('active');
+        state.avatar = e.target.getAttribute('data-avatar');
+      });
+    });
 
     // Permission denied → home
     document.getElementById('btn-denied-home').addEventListener('click', goHome);
@@ -139,7 +150,8 @@ const App = (() => {
     SocketService.joinQueue({
       gender: state.gender,
       mode: state.mode,
-      location: state.location
+      location: state.location,
+      avatar: state.avatar
     });
   }
 
@@ -150,6 +162,10 @@ const App = (() => {
       state.currentRoomId = data.roomId;
       state.isSearching = false;
       const peerLocation = data.peerLocation || { city: 'Unknown', flag: '🌍' };
+      const peerAvatar = data.peerAvatar || '👤';
+
+      // Set user selected profile avatars
+      UI.setAvatars(state.avatar, peerAvatar);
 
       if (data.mode === 'video') {
         UI.setConnecting(true);
