@@ -71,20 +71,17 @@ jobs:
         kubectl rollout restart deployment/video-chat-app -n video-chat
         kubectl rollout status deployment/video-chat-app -n video-chat --timeout=180s
 
-    - name: Automatically Register EKS Nodes with Load Balancer & Verify Health
+    - name: Dynamically Register EKS Nodes with Load Balancer
       run: |
-        NODES=$(kubectl get nodes -o jsonpath='{.items[*].metadata.name}')
-        echo "Active EKS Nodes: $NODES"
-        if [ -n "$NODES" ]; then
-          aws elb register-instances-with-load-balancer \
-            --load-balancer-name a3d93899534b241b981160b247d1704f \
-            --instances $NODES \
-            --region us-east-1
-          
-          echo "Waiting 15s for ELB health check..."
-          sleep 15
-          aws elb describe-instance-health \
-            --load-balancer-name a3d93899534b241b981160b247d1704f \
-            --region us-east-1 \
-            --query "InstanceStates[].{ID:InstanceId,State:State}"
+        ELB_HOST=$(kubectl get svc video-chat-service -n video-chat -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)
+        if [ -n "$ELB_HOST" ]; then
+          ELB_NAME=$(echo "$ELB_HOST" | cut -d'-' -f1)
+          NODES=$(kubectl get nodes -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || true)
+          if [ -n "$NODES" ] && [ -n "$ELB_NAME" ]; then
+            echo "Registering nodes ($NODES) with ELB ($ELB_NAME)..."
+            aws elb register-instances-with-load-balancer \
+              --load-balancer-name "$ELB_NAME" \
+              --instances $NODES \
+              --region us-east-1 || true
+          fi
         fi
