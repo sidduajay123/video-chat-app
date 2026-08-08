@@ -66,15 +66,22 @@ const matchmaker = new Matchmaker();
 // ─── Socket.IO Events ─────────────────────────────────────────────────────────
 const joinRateLimitMap = new Map(); // socketId -> last join timestamp
 
+// Broadcast active user count
+function broadcastUserCount() {
+  const count = io.sockets.sockets.size;
+  io.emit('user-count', { count });
+}
+
 io.on('connection', (socket) => {
   console.log(`[+] Connected: ${socket.id}`);
+  broadcastUserCount();
 
   // ── Join Queue ──────────────────────────────────────────────────────────────
   socket.on('join-queue', ({ gender, mode, location, avatar }) => {
-    // Rate limit: max 1 join per 2 seconds
+    // Rate limit: max 1 join per 500ms
     const lastJoin = joinRateLimitMap.get(socket.id) || 0;
     const now = Date.now();
-    if (now - lastJoin < 2000) {
+    if (now - lastJoin < 500) {
       socket.emit('error', { message: 'Too many requests. Please wait.' });
       return;
     }
@@ -166,6 +173,7 @@ io.on('connection', (socket) => {
       io.to(peerSocketId).emit('peer-left', { reason: 'disconnected' });
     }
     console.log(`[-] Disconnected: ${socket.id}`);
+    broadcastUserCount();
   });
 });
 

@@ -42,8 +42,18 @@ class Matchmaker {
     // 2. Fall back to matching with same gender
     if (sameQueue.length > 0) {
       const peer = sameQueue.shift();
-      // Remove matched peer from the real queue
       this.queues[mode][gender] = this.queues[mode][gender].filter(u => u.socketId !== peer.socketId);
+      return this.createMatchedRoom(socketId, gender, location, peer.socketId, peer.gender, peer.location, mode);
+    }
+
+    // 3. Match with anyone waiting in any gender queue (instant match regardless of gender)
+    const anyQueue = [...this.queues[mode][oppositeGender], ...this.queues[mode][gender]]
+      .filter(u => u.socketId !== socketId)
+      .sort((a, b) => a.joinedAt - b.joinedAt); // oldest waiter first
+
+    if (anyQueue.length > 0) {
+      const peer = anyQueue[0];
+      this.queues[mode][peer.gender] = this.queues[mode][peer.gender].filter(u => u.socketId !== peer.socketId);
       return this.createMatchedRoom(socketId, gender, location, peer.socketId, peer.gender, peer.location, mode);
     }
 
@@ -51,6 +61,7 @@ class Matchmaker {
     this.queues[mode][gender].push({ socketId, gender, location, joinedAt: Date.now() });
     return { matched: false, queued: true };
   }
+
 
   /**
    * Helper to instantiate a matched room pair

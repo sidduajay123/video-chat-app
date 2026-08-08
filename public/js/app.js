@@ -12,7 +12,8 @@ const App = (() => {
     isCamOn: true,
     sidebarOpen: true,
     currentRoomId: null,
-    isSearching: false
+    isSearching: false,
+    isCancelled: false
   };
 
   // ── Init ───────────────────────────────────────────────────────────────────
@@ -21,12 +22,29 @@ const App = (() => {
     SocketService.connect();
     bindEvents();
     wireSocketHandlers();
+    restoreGender();
     UI.showScreen('screen-home');
+  }
+
+  // ① Restore saved gender/avatar from localStorage
+  function restoreGender() {
+    const saved = localStorage.getItem('user-gender');
+    if (saved === 'male' || saved === 'female') {
+      state.gender = saved;
+      const btn = document.getElementById(saved === 'male' ? 'btn-male' : 'btn-female');
+      if (btn) btn.classList.add('selected');
+    }
+    const savedAvatar = localStorage.getItem('user-avatar');
+    if (savedAvatar) {
+      state.avatar = savedAvatar;
+      document.querySelectorAll('.avatar-option').forEach(b => {
+        b.classList.toggle('active', b.getAttribute('data-avatar') === savedAvatar);
+      });
+    }
   }
 
   // ── Button Event Bindings ──────────────────────────────────────────────────
   function bindEvents() {
-    // Home → Mode
     document.getElementById('btn-video-mode').addEventListener('click', () => {
       state.mode = 'video';
       UI.showScreen('screen-gender');
@@ -36,35 +54,47 @@ const App = (() => {
       UI.showScreen('screen-gender');
     });
 
-    // Gender back
     document.getElementById('btn-gender-back').addEventListener('click', () => {
       UI.showScreen('screen-home');
     });
 
-    // Gender selection
     document.getElementById('btn-male').addEventListener('click', () => handleGenderSelect('male'));
     document.getElementById('btn-female').addEventListener('click', () => handleGenderSelect('female'));
 
-    // Avatar selection clicks
-    const avatarOpts = document.querySelectorAll('.avatar-option');
-    avatarOpts.forEach(btn => {
+    document.querySelectorAll('.avatar-option').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        avatarOpts.forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.avatar-option').forEach(b => b.classList.remove('active'));
         e.target.classList.add('active');
         state.avatar = e.target.getAttribute('data-avatar');
+        localStorage.setItem('user-avatar', state.avatar);
       });
     });
 
-    // Permission denied → home
     document.getElementById('btn-denied-home').addEventListener('click', goHome);
 
-    // Cancel search
+    // ④ Cancel — stay on screen, show Start Chat
     document.getElementById('btn-cancel-search').addEventListener('click', () => {
       state.isSearching = false;
-      goHome();
+      state.isCancelled = true;
+      SocketService.next();
+      const pulse = document.getElementById('search-pulse');
+      if (pulse) pulse.style.animationPlayState = 'paused';
+      const title = document.getElementById('searching-title');
+      if (title) title.textContent = 'Search cancelled';
+      const info = document.getElementById('searching-info');
+      if (info) info.textContent = 'Click Start Chat to find a new match.';
+      document.getElementById('btn-cancel-search').style.display = 'none';
+      document.getElementById('btn-start-chat').style.display = 'inline-flex';
     });
 
-    // Video controls
+    // ④ Start Chat button
+    document.getElementById('btn-start-chat').addEventListener('click', () => {
+      state.isCancelled = false;
+      resetSearchUI();
+      UI.setSearchingInfo(state.gender, state.mode, state.location);
+      joinQueue();
+    });
+
     document.getElementById('btn-toggle-mic').addEventListener('click', toggleMic);
     document.getElementById('btn-toggle-cam').addEventListener('click', toggleCam);
     document.getElementById('btn-show-chat').addEventListener('click', () => {
@@ -77,18 +107,12 @@ const App = (() => {
     });
     document.getElementById('btn-video-next').addEventListener('click', handleNext);
     document.getElementById('btn-video-end').addEventListener('click', goHome);
-
-    // Video chat input
     document.getElementById('btn-video-send').addEventListener('click', () => sendMessage('video'));
     document.getElementById('video-chat-input').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') sendMessage('video');
     });
-
-    // Text controls
     document.getElementById('btn-text-next').addEventListener('click', handleNext);
     document.getElementById('btn-text-end').addEventListener('click', goHome);
-
-    // Text chat input
     document.getElementById('btn-text-send').addEventListener('click', () => sendMessage('text'));
     document.getElementById('text-chat-input').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') sendMessage('text');
@@ -98,12 +122,15 @@ const App = (() => {
   // ── Gender Selected ────────────────────────────────────────────────────────
   async function handleGenderSelect(gender) {
     state.gender = gender;
+    localStorage.setItem('user-gender', gender);
+    document.getElementById('btn-male').classList.toggle('selected', gender === 'male');
+    document.getElementById('btn-female').classList.toggle('selected', gender === 'female');
 
     if (state.mode === 'video') {
       await handleVideoPermissions();
     } else {
-      // Text mode — just resolve location and queue
       UI.showScreen('screen-searching');
+      resetSearchUI();
       state.location = await LocationService.resolve();
       UI.setSearchingInfo(state.gender, state.mode, state.location);
       joinQueue();
@@ -114,12 +141,10 @@ const App = (() => {
   async function handleVideoPermissions() {
     UI.showScreen('screen-permission');
 
-    // Step 1: Location (non-blocking)
     UI.setPermStatus('location', 'pending');
     state.location = await LocationService.resolve();
     UI.setPermStatus('location', 'success');
 
-    // Step 2: Camera + Mic (BLOCKING GATE)
     UI.setPermStatus('camera', 'pending');
     try {
       const stream = await WebRTCService.requestMediaPermissions();
@@ -127,21 +152,39 @@ const App = (() => {
       UI.setPermStatus('camera', 'success');
       UI.setLocalVideo(stream);
 
-      // Success → go to search
+      // ② Mirror to search screen self-preview
+      const searchSelf = document.getElementById('search-self-video');
+      if (searchSelf) searchSelf.srcObject = stream;
+
       setTimeout(() => {
         UI.showScreen('screen-searching');
+        resetSearchUI();
         UI.setSearchingInfo(state.gender, state.mode, state.location);
         joinQueue();
       }, 600);
 
     } catch (err) {
-      // Permission denied — HARD GATE
       UI.setPermStatus('camera', 'error');
       setTimeout(() => {
         UI.showScreen('screen-denied');
         UI.startCountdown(3, goHome);
       }, 500);
     }
+  }
+
+  // ── Reset search screen to searching state ────────────────────────────────
+  function resetSearchUI() {
+    state.isCancelled = false;
+    const pulse = document.getElementById('search-pulse');
+    if (pulse) pulse.style.animationPlayState = 'running';
+    const title = document.getElementById('searching-title');
+    if (title) title.textContent = 'Finding your match...';
+    document.getElementById('btn-cancel-search').style.display = 'inline-flex';
+    document.getElementById('btn-start-chat').style.display = 'none';
+
+    // ② Show self-preview only in video mode
+    const previewWrap = document.getElementById('self-preview-wrap');
+    if (previewWrap) previewWrap.style.display = state.mode === 'video' ? 'block' : 'none';
   }
 
   // ── Join Matchmaking Queue ─────────────────────────────────────────────────
@@ -157,6 +200,13 @@ const App = (() => {
 
   // ── Socket Event Handlers ──────────────────────────────────────────────────
   function wireSocketHandlers() {
+
+    // ⑤ Active user count
+    SocketService.on('onUserCount', (data) => {
+      const el = document.getElementById('active-users-count');
+      if (el) el.textContent = data.count;
+    });
+
     // Matched with a peer
     SocketService.on('onMatched', async (data) => {
       state.currentRoomId = data.roomId;
@@ -164,7 +214,6 @@ const App = (() => {
       const peerLocation = data.peerLocation || { city: 'Unknown', flag: '🌍' };
       const peerAvatar = data.peerAvatar || '👤';
 
-      // Set user selected profile avatars
       UI.setAvatars(state.avatar, peerAvatar);
 
       if (data.mode === 'video') {
@@ -184,8 +233,8 @@ const App = (() => {
           SocketService.sendIceCandidate(candidate);
         });
 
-        WebRTCService.setOnConnectionState((state) => {
-          if (state === 'failed' || state === 'disconnected') {
+        WebRTCService.setOnConnectionState((connState) => {
+          if (connState === 'failed' || connState === 'disconnected') {
             UI.showToast('⚠️ Connection unstable...');
           }
         });
@@ -197,7 +246,6 @@ const App = (() => {
           SocketService.sendOffer(offer);
         }
       } else {
-        // Text mode
         UI.setTextLocation('peer', peerLocation);
         UI.setTextLocation('self', state.location);
         UI.clearMessages('text-chat-messages');
@@ -205,7 +253,6 @@ const App = (() => {
       }
     });
 
-    // WebRTC signaling
     SocketService.on('onOffer', async (sdp) => {
       const answer = await WebRTCService.handleOffer(sdp);
       SocketService.sendAnswer(answer);
@@ -219,7 +266,6 @@ const App = (() => {
       await WebRTCService.addIceCandidate(candidate);
     });
 
-    // Incoming message
     SocketService.on('onMessage', (msg) => {
       const containerId = state.mode === 'video' ? 'video-chat-messages' : 'text-chat-messages';
       UI.appendMessage(containerId, {
@@ -229,24 +275,34 @@ const App = (() => {
       });
     });
 
-    // Peer left / skipped
+    // ③ Peer left — show message then auto re-search
     SocketService.on('onPeerLeft', (data) => {
-      const reason = data.reason === 'skipped' ? 'Stranger moved on 👋' : 'Stranger disconnected 👋';
-      UI.showToast(reason);
+      const isSkipped = data.reason === 'skipped';
+      UI.showToast(isSkipped ? 'Stranger skipped 👋' : 'Stranger disconnected 👋');
       WebRTCService.closePeerConnection();
       UI.clearVideos();
 
+      UI.showScreen('screen-searching');
+      resetSearchUI();
+
+      // Show brief disconnected state
+      const title = document.getElementById('searching-title');
+      const info = document.getElementById('searching-info');
+      if (title) title.textContent = isSkipped ? '⏭ Stranger skipped you' : '😔 Stranger disconnected';
+      if (info) info.textContent = 'Finding a new match...';
+
+      // Restore self-preview stream
+      if (state.mode === 'video' && state.localStream) {
+        const searchSelf = document.getElementById('search-self-video');
+        if (searchSelf) searchSelf.srcObject = state.localStream;
+      }
+
+      // Auto re-queue after 1.5s
       setTimeout(() => {
-        // Auto re-queue
-        if (state.mode === 'video') {
-          UI.showScreen('screen-searching');
-          UI.setSearchingInfo(state.gender, state.mode, state.location);
-        } else {
-          UI.showScreen('screen-searching');
-          UI.setSearchingInfo(state.gender, state.mode, state.location);
-        }
+        if (title) title.textContent = 'Finding your match...';
+        UI.setSearchingInfo(state.gender, state.mode, state.location);
         joinQueue();
-      }, 2000);
+      }, 1500);
     });
 
     SocketService.on('onError', (err) => {
@@ -259,12 +315,18 @@ const App = (() => {
     SocketService.next();
     WebRTCService.closePeerConnection();
     UI.clearVideos();
-    UI.setConnecting(true);
     UI.clearMessages('video-chat-messages');
     UI.clearMessages('text-chat-messages');
 
     UI.showScreen('screen-searching');
+    resetSearchUI();
     UI.setSearchingInfo(state.gender, state.mode, state.location);
+
+    if (state.mode === 'video' && state.localStream) {
+      const searchSelf = document.getElementById('search-self-video');
+      if (searchSelf) searchSelf.srcObject = state.localStream;
+    }
+
     joinQueue();
   }
 
@@ -290,7 +352,6 @@ const App = (() => {
     const containerId = chatMode === 'video' ? 'video-chat-messages' : 'text-chat-messages';
     const input = document.getElementById(inputId);
     if (!input || !input.value.trim()) return;
-
     const text = input.value.trim();
     SocketService.sendMessage(text);
     UI.appendMessage(containerId, { text, fromMe: true, timestamp: Date.now() });
@@ -304,10 +365,9 @@ const App = (() => {
     UI.clearMessages('video-chat-messages');
     UI.clearMessages('text-chat-messages');
 
-    // Reset state
     state.mode = null;
-    state.gender = null;
     state.isSearching = false;
+    state.isCancelled = false;
     state.currentRoomId = null;
     state.isMicOn = true;
     state.isCamOn = true;
@@ -318,5 +378,4 @@ const App = (() => {
   return { init };
 })();
 
-// Boot the app
 document.addEventListener('DOMContentLoaded', () => App.init());

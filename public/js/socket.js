@@ -52,6 +52,11 @@ const SocketService = (() => {
       if (handlers.onPeerLeft) handlers.onPeerLeft(data);
     });
 
+    socket.on('user-count', (data) => {
+      console.log('[Socket] User count:', data.count);
+      if (handlers.onUserCount) handlers.onUserCount(data);
+    });
+
     socket.on('error', (err) => {
       console.error('[Socket] Error:', err.message);
       if (handlers.onError) handlers.onError(err);
@@ -60,9 +65,9 @@ const SocketService = (() => {
     return socket;
   }
 
-  function joinQueue({ gender, mode, location }) {
+  function joinQueue({ gender, mode, location, avatar }) {
     if (!socket) return;
-    socket.emit('join-queue', { gender, mode, location });
+    socket.emit('join-queue', { gender, mode, location, avatar });
   }
 
   function sendOffer(sdp) {

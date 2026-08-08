@@ -11,6 +11,11 @@
   <link rel="stylesheet" href="/css/style.css" />
 </head>
 <body>
+  <!-- Active user count badge (always visible) -->
+  <div id="active-users-badge" class="active-users-badge">
+    <span class="users-dot"></span>
+    <span id="active-users-count">0</span> online
+  </div>
 
   <!-- ═══════════════ SCREEN 1: HOME ═══════════════ -->
   <div id="screen-home" class="screen active">
@@ -121,17 +126,28 @@
       <div class="orb orb-1"></div>
       <div class="orb orb-3"></div>
     </div>
-    <div class="searching-content">
-      <div class="pulse-rings">
-        <div class="ring ring-1"></div>
-        <div class="ring ring-2"></div>
-        <div class="ring ring-3"></div>
-        <div class="search-center">⚡</div>
+    <div class="searching-layout">
+      <!-- Self preview -->
+      <div class="self-preview-wrap" id="self-preview-wrap">
+        <video id="search-self-video" autoplay playsinline muted class="self-preview-video"></video>
+        <div class="self-preview-label">You</div>
       </div>
-      <h2 class="screen-title">Finding your match...</h2>
-      <p class="screen-sub" id="searching-info"></p>
-      <div class="searching-tags" id="searching-tags"></div>
-      <button class="btn-outline" id="btn-cancel-search">Cancel</button>
+      <!-- Search info -->
+      <div class="searching-content">
+        <div class="pulse-rings" id="search-pulse">
+          <div class="ring ring-1"></div>
+          <div class="ring ring-2"></div>
+          <div class="ring ring-3"></div>
+          <div class="search-center">⚡</div>
+        </div>
+        <h2 class="screen-title" id="searching-title">Finding your match...</h2>
+        <p class="screen-sub" id="searching-info"></p>
+        <div class="searching-tags" id="searching-tags"></div>
+        <div class="search-actions">
+          <button class="btn-outline" id="btn-cancel-search">Cancel</button>
+          <button class="btn-primary" id="btn-start-chat" style="display:none;">▶ Start Chat</button>
+        </div>
+      </div>
     </div>
   </div>
 
