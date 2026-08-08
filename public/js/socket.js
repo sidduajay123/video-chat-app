@@ -7,7 +7,7 @@ const SocketService = (() => {
 
   function connect() {
     socket = io({
-      transports: ['polling', 'websocket'],
+      transports: ['polling'],
       reconnection: true,
       reconnectionAttempts: 10,
       reconnectionDelay: 1000,

@@ -70,3 +70,21 @@ jobs:
         # Force rollout restart to guarantee instant container update
         kubectl rollout restart deployment/video-chat-app -n video-chat
         kubectl rollout status deployment/video-chat-app -n video-chat --timeout=180s
+
+    - name: Automatically Register EKS Nodes with Load Balancer & Verify Health
+      run: |
+        NODE_IDS=$(kubectl get nodes -o jsonpath='{.items[*].metadata.name}')
+        echo "Active EKS Nodes: $NODE_IDS"
+        if [ -n "$NODE_IDS" ]; then
+          aws elb register-instances-with-load-balancer \
+            --load-balancer-name a3d93899534b241b981160b247d1704f \
+            --instances $NODE_IDS \
+            --region us-east-1
+          
+          echo "Waiting 15s for ELB health check..."
+          sleep 15
+          aws elb describe-instance-health \
+            --load-balancer-name a3d93899534b241b981160b247d1704f \
+            --region us-east-1 \
+            --query "InstanceStates[].{ID:InstanceId,State:State}"
+        fi
