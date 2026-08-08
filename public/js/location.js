@@ -25,21 +25,21 @@ const LocationService = (() => {
    */
   async function resolveIPLocation() {
     try {
-      // Primary: ipapi.co (returns detailed country, city, and code)
-      const res = await fetch('https://ipapi.co/json/');
+      // Primary: internal /api/location endpoint
+      const res = await fetch('/api/location');
       const data = await res.json();
       if (data && data.city) {
-        const country = data.country_name || '';
-        const countryCode = data.country_code ? data.country_code.toUpperCase() : '';
+        const country = data.country || '';
+        const countryCode = data.countryCode ? data.countryCode.toUpperCase() : '';
         const flag = getFlagEmoji(countryCode);
         return { city: data.city, country, countryCode, flag };
       }
     } catch (e) {
-      console.log('Primary geo IP failed, trying fallback...', e.message);
+      console.log('Primary geo IP failed, trying fallback...');
     }
 
     try {
-      // Fallback: geojs.io
+      // Fallback: geojs.io (supports CORS)
       const res = await fetch('https://get.geojs.io/v1/ip/geo.json');
       const data = await res.json();
       if (data && data.city) {
@@ -49,7 +49,7 @@ const LocationService = (() => {
         return { city: data.city, country, countryCode, flag };
       }
     } catch (e) {
-      console.log('Fallback geo IP failed', e.message);
+      console.log('Fallback geo IP failed');
     }
 
     return { city: 'Unknown', country: '', countryCode: '', flag: '🌍' };

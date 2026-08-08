@@ -63,6 +63,20 @@ app.get('/api/stats', (req, res) => {
   res.json(matchmaker.getStats());
 });
 
+app.get('/api/location', async (req, res) => {
+  try {
+    const r = await fetch('https://get.geojs.io/v1/ip/geo.json');
+    const data = await r.json();
+    res.json({
+      city: data.city || 'Unknown',
+      country: data.country || '',
+      countryCode: data.country_code || '',
+    });
+  } catch (e) {
+    res.json({ city: 'Unknown', country: '', countryCode: '' });
+  }
+});
+
 // ─── Matchmaker ───────────────────────────────────────────────────────────────
 const matchmaker = new Matchmaker();
 
