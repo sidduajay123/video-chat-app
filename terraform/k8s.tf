@@ -68,7 +68,7 @@ resource "kubernetes_deployment" "video_chat_app" {
       spec {
         container {
           name  = "video-chat-app"
-          image = "${aws_ecr_repository.app_repo.repository_url}:latest"
+          image = "${data.aws_ecr_repository.app_repo.repository_url}:latest"
 
           port {
             container_port = 3000
