@@ -145,79 +145,23 @@ resource "aws_security_group" "eks_node_sg" {
 }
 
 # ─── IAM Roles for EKS ─────────────────────────────────────────────────────────
-resource "aws_iam_role" "eks_cluster_role" {
+data "aws_iam_role" "eks_cluster_role" {
   name = "EKS-Cluster-Role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
-        Principal = {
-          Service = "eks.amazonaws.com"
-        }
-      }
-    ]
-  })
 }
 
-resource "aws_iam_role_policy_attachment" "eks_cluster_policy" {
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
-  role       = aws_iam_role.eks_cluster_role.name
-}
-
-resource "aws_iam_role" "eks_node_role" {
+data "aws_iam_role" "eks_node_role" {
   name = "EKS-Node-Group-Role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
-        Principal = {
-          Service = "ec2.amazonaws.com"
-        }
-      }
-    ]
-  })
-}
-
-resource "aws_iam_role_policy_attachment" "eks_worker_node_policy" {
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
-  role       = aws_iam_role.eks_node_role.name
-}
-
-resource "aws_iam_role_policy_attachment" "eks_cni_policy" {
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
-  role       = aws_iam_role.eks_node_role.name
-}
-
-resource "aws_iam_role_policy_attachment" "ecr_read_only" {
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
-  role       = aws_iam_role.eks_node_role.name
 }
 
 # ─── ECR Repository ────────────────────────────────────────────────────────────
-resource "aws_ecr_repository" "app_repo" {
-  name                 = "video-chat-app"
-  image_tag_mutability = "MUTABLE"
-
-  image_scanning_configuration {
-    scan_on_push = true
-  }
-
-  tags = {
-    Name        = "video-chat-app"
-    Environment = var.environment
-  }
+data "aws_ecr_repository" "app_repo" {
+  name = "video-chat-app"
 }
 
 # ─── EKS Cluster ───────────────────────────────────────────────────────────────
 resource "aws_eks_cluster" "video_chat_cluster" {
   name     = var.cluster_name
-  role_arn = aws_iam_role.eks_cluster_role.arn
+  role_arn = data.aws_iam_role.eks_cluster_role.arn
 
   vpc_config {
     subnet_ids              = aws_subnet.public_subnets[*].id
@@ -244,10 +188,6 @@ resource "aws_eks_cluster" "video_chat_cluster" {
     }
   }
 
-  depends_on = [
-    aws_iam_role_policy_attachment.eks_cluster_policy
-  ]
-
   tags = {
     Name        = var.cluster_name
     Environment = var.environment
@@ -258,7 +198,7 @@ resource "aws_eks_cluster" "video_chat_cluster" {
 resource "aws_eks_node_group" "video_chat_nodes" {
   cluster_name    = aws_eks_cluster.video_chat_cluster.name
   node_group_name = "video-chat-nodes"
-  node_role_arn   = aws_iam_role.eks_node_role.arn
+  node_role_arn   = data.aws_iam_role.eks_node_role.arn
   subnet_ids      = aws_subnet.public_subnets[*].id
   instance_types  = [var.node_instance_type]
   capacity_type   = "ON_DEMAND"
@@ -274,12 +214,6 @@ resource "aws_eks_node_group" "video_chat_nodes" {
   update_config {
     max_unavailable = 1
   }
-
-  depends_on = [
-    aws_iam_role_policy_attachment.eks_worker_node_policy,
-    aws_iam_role_policy_attachment.eks_cni_policy,
-    aws_iam_role_policy_attachment.ecr_read_only
-  ]
 
   tags = {
     Name        = "video-chat-nodes"
