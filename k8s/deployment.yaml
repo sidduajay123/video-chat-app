@@ -51,7 +51,7 @@ spec:
 
       containers:
         - name: video-chat-app
-          image: sidduajay123/video-chat-app:latest
+          image: 181137999309.dkr.ecr.us-east-1.amazonaws.com/video-chat-app:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 3000
@@ -127,10 +127,6 @@ metadata:
     service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "http"
     service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout: "3600"
 spec:
-  sessionAffinity: ClientIP
-  sessionAffinityConfig:
-    clientIP:
-      timeoutSeconds: 10800
   selector:
     app: video-chat-app
   ports:
