@@ -25,10 +25,18 @@ describe('Matchmaker', () => {
       expect([result.caller, result.callee]).toContain('socket-2');
     });
 
-    test('should NOT match same gender', () => {
+    test('should match same gender as fallback', () => {
       mm.enqueue('socket-1', 'male', 'video', {});
       const result = mm.enqueue('socket-2', 'male', 'video', {});
-      expect(result.matched).toBe(false);
+      expect(result.matched).toBe(true);
+    });
+
+    test('should prioritize opposite gender match over same gender', () => {
+      mm.enqueue('socket-1', 'male', 'video', {}); // in queue
+      // F1 joins - should match socket-1 (opposite gender)
+      const result = mm.enqueue('F1', 'female', 'video', {});
+      expect(result.matched).toBe(true);
+      expect(result.callee).toBe('socket-1');
     });
 
     test('should NOT match different modes', () => {
@@ -55,7 +63,9 @@ describe('Matchmaker', () => {
 
     test('should remove stale entry before re-queuing', () => {
       mm.enqueue('socket-1', 'male', 'video', {});
-      mm.enqueue('socket-1', 'male', 'video', {}); // re-queue same socket
+      const result = mm.enqueue('socket-1', 'male', 'video', {}); // re-queue same socket
+      // Socket cannot match with itself — should be queued again
+      expect(result.matched).toBe(false);
       expect(mm.queues.video.male.length).toBe(1);
     });
 
@@ -198,10 +208,13 @@ describe('Matchmaker', () => {
   // ── Multiple concurrent matches ────────────────────────────────────────────
   describe('multiple concurrent sessions', () => {
     test('should handle multiple concurrent matches independently', () => {
+      // M1 and F1 opposite genders
       mm.enqueue('M1', 'male', 'video', {});
-      mm.enqueue('M2', 'male', 'video', {});
       const r1 = mm.enqueue('F1', 'female', 'video', {});
+      // M2 and F2 opposite genders
+      mm.enqueue('M2', 'male', 'video', {});
       const r2 = mm.enqueue('F2', 'female', 'video', {});
+
       expect(r1.matched).toBe(true);
       expect(r2.matched).toBe(true);
       expect(r1.roomId).not.toBe(r2.roomId);
