@@ -21,61 +21,46 @@ const LocationService = (() => {
   }
 
   /**
-   * Get coordinates from browser geolocation API
-   * @returns {Promise<{lat, lng}|null>}
+   * Fetch location silently via IP-based Geolocation API
    */
-  function getCoordinates() {
-    return new Promise((resolve) => {
-      if (!navigator.geolocation) {
-        resolve(null);
-        return;
-      }
-      navigator.geolocation.getCurrentPosition(
-        (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-        () => resolve(null),
-        { timeout: 8000, maximumAge: 300000 }
-      );
-    });
-  }
-
-  /**
-   * Reverse geocode using Nominatim (OpenStreetMap) — free, no key
-   * @param {number} lat
-   * @param {number} lng
-   * @returns {Promise<{city, country, countryCode, flag}>}
-   */
-  async function reverseGeocode(lat, lng) {
+  async function resolveIPLocation() {
     try {
-      const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`;
-      const res = await fetch(url, {
-        headers: { 'Accept-Language': 'en' }
-      });
+      // Primary: ipapi.co (returns detailed country, city, and code)
+      const res = await fetch('https://ipapi.co/json/');
       const data = await res.json();
-      const addr = data.address || {};
-      const city = addr.city || addr.town || addr.village || addr.county || 'Unknown';
-      const country = addr.country || '';
-      const countryCode = addr.country_code ? addr.country_code.toUpperCase() : '';
-      const flag = getFlagEmoji(countryCode);
-      return { city, country, countryCode, flag };
-    } catch {
-      return { city: 'Unknown', country: '', countryCode: '', flag: '🌍' };
+      if (data && data.city) {
+        const country = data.country_name || '';
+        const countryCode = data.country_code ? data.country_code.toUpperCase() : '';
+        const flag = getFlagEmoji(countryCode);
+        return { city: data.city, country, countryCode, flag };
+      }
+    } catch (e) {
+      console.log('Primary geo IP failed, trying fallback...', e.message);
     }
+
+    try {
+      // Fallback: geojs.io
+      const res = await fetch('https://get.geojs.io/v1/ip/geo.json');
+      const data = await res.json();
+      if (data && data.city) {
+        const country = data.country || '';
+        const countryCode = data.country_code ? data.country_code.toUpperCase() : '';
+        const flag = getFlagEmoji(countryCode);
+        return { city: data.city, country, countryCode, flag };
+      }
+    } catch (e) {
+      console.log('Fallback geo IP failed', e.message);
+    }
+
+    return { city: 'Unknown', country: '', countryCode: '', flag: '🌍' };
   }
 
   /**
-   * Full location resolution: geo → reverse geocode
-   * Never rejects — always returns something
+   * Full location resolution: silent IP lookup
    */
   async function resolve() {
     if (cachedLocation) return cachedLocation;
-
-    const coords = await getCoordinates();
-    if (!coords) {
-      cachedLocation = { city: 'Unknown', country: '', countryCode: '', flag: '🌍' };
-      return cachedLocation;
-    }
-
-    const geo = await reverseGeocode(coords.lat, coords.lng);
+    const geo = await resolveIPLocation();
     cachedLocation = geo;
     return cachedLocation;
   }
