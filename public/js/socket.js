@@ -7,11 +7,11 @@ const SocketService = (() => {
 
   function connect() {
     socket = io({
-      transports: ['polling'],
+      transports: ['polling', 'websocket'],
       reconnection: true,
-      reconnectionAttempts: 10,
+      reconnectionAttempts: 20,
       reconnectionDelay: 1000,
-      timeout: 20000
+      timeout: 30000
     });
 
     // Handle BFCache (Back-Forward cache) page restoration
