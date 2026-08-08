@@ -66,3 +66,7 @@ jobs:
         
         # Deploy k8s manifests
         kubectl apply -f k8s/deployment.yaml
+        
+        # Force rollout restart to guarantee instant container update
+        kubectl rollout restart deployment/video-chat-app -n video-chat
+        kubectl rollout status deployment/video-chat-app -n video-chat --timeout=180s

@@ -195,12 +195,10 @@ const UI = (() => {
   }
 
   /**
-   * Clear video elements
+   * Clear remote video element (keep local video active)
    */
   function clearVideos() {
-    const local = document.getElementById('local-video');
     const remote = document.getElementById('remote-video');
-    if (local) local.srcObject = null;
     if (remote) remote.srcObject = null;
   }
 

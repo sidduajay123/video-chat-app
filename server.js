@@ -78,10 +78,10 @@ io.on('connection', (socket) => {
 
   // ── Join Queue ──────────────────────────────────────────────────────────────
   socket.on('join-queue', ({ gender, mode, location, avatar }) => {
-    // Rate limit: max 1 join per 500ms
+    // Rate limit: max 1 join per 100ms
     const lastJoin = joinRateLimitMap.get(socket.id) || 0;
     const now = Date.now();
-    if (now - lastJoin < 500) {
+    if (now - lastJoin < 100) {
       socket.emit('error', { message: 'Too many requests. Please wait.' });
       return;
     }

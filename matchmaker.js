@@ -25,40 +25,26 @@ class Matchmaker {
     if (!['male', 'female'].includes(gender)) return null;
     if (!['video', 'text'].includes(mode)) return null;
 
-    const oppositeGender = gender === 'male' ? 'female' : 'male';
-
     // Remove any stale entry for this socket first
     this.removeFromQueues(socketId);
 
-    const oppositeQueue = this.queues[mode][oppositeGender];
-    const sameQueue = this.queues[mode][gender].filter(u => u.socketId !== socketId);
+    const oppositeGender = gender === 'male' ? 'female' : 'male';
+    const queueMap = this.queues[mode];
 
-    // 1. Try to match with opposite gender first
-    if (oppositeQueue.length > 0) {
-      const peer = oppositeQueue.shift();
+    // 1. Try opposite gender first
+    if (queueMap[oppositeGender].length > 0) {
+      const peer = queueMap[oppositeGender].shift();
       return this.createMatchedRoom(socketId, gender, location, peer.socketId, peer.gender, peer.location, mode);
     }
 
-    // 2. Fall back to matching with same gender
-    if (sameQueue.length > 0) {
-      const peer = sameQueue.shift();
-      this.queues[mode][gender] = this.queues[mode][gender].filter(u => u.socketId !== peer.socketId);
-      return this.createMatchedRoom(socketId, gender, location, peer.socketId, peer.gender, peer.location, mode);
-    }
-
-    // 3. Match with anyone waiting in any gender queue (instant match regardless of gender)
-    const anyQueue = [...this.queues[mode][oppositeGender], ...this.queues[mode][gender]]
-      .filter(u => u.socketId !== socketId)
-      .sort((a, b) => a.joinedAt - b.joinedAt); // oldest waiter first
-
-    if (anyQueue.length > 0) {
-      const peer = anyQueue[0];
-      this.queues[mode][peer.gender] = this.queues[mode][peer.gender].filter(u => u.socketId !== peer.socketId);
+    // 2. Fall back to same gender (match instantly with anyone waiting)
+    if (queueMap[gender].length > 0) {
+      const peer = queueMap[gender].shift();
       return this.createMatchedRoom(socketId, gender, location, peer.socketId, peer.gender, peer.location, mode);
     }
 
     // No match yet — add to queue
-    this.queues[mode][gender].push({ socketId, gender, location, joinedAt: Date.now() });
+    queueMap[gender].push({ socketId, gender, location, joinedAt: Date.now() });
     return { matched: false, queued: true };
   }
 

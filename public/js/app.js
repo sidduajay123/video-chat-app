@@ -218,6 +218,7 @@ const App = (() => {
 
       if (data.mode === 'video') {
         UI.setConnecting(true);
+        if (state.localStream) UI.setLocalVideo(state.localStream);
         UI.setLocationBadge('peer', peerLocation);
         UI.setLocationBadge('self', state.location);
         UI.showScreen('screen-video');
@@ -275,7 +276,7 @@ const App = (() => {
       });
     });
 
-    // ③ Peer left — show message then auto re-search
+    // ③ Peer left — instant re-search
     SocketService.on('onPeerLeft', (data) => {
       const isSkipped = data.reason === 'skipped';
       UI.showToast(isSkipped ? 'Stranger skipped 👋' : 'Stranger disconnected 👋');
@@ -284,12 +285,7 @@ const App = (() => {
 
       UI.showScreen('screen-searching');
       resetSearchUI();
-
-      // Show brief disconnected state
-      const title = document.getElementById('searching-title');
-      const info = document.getElementById('searching-info');
-      if (title) title.textContent = isSkipped ? '⏭ Stranger skipped you' : '😔 Stranger disconnected';
-      if (info) info.textContent = 'Finding a new match...';
+      UI.setSearchingInfo(state.gender, state.mode, state.location);
 
       // Restore self-preview stream
       if (state.mode === 'video' && state.localStream) {
@@ -297,12 +293,8 @@ const App = (() => {
         if (searchSelf) searchSelf.srcObject = state.localStream;
       }
 
-      // Auto re-queue after 1.5s
-      setTimeout(() => {
-        if (title) title.textContent = 'Finding your match...';
-        UI.setSearchingInfo(state.gender, state.mode, state.location);
-        joinQueue();
-      }, 1500);
+      // Join queue immediately (0ms delay) for instant pairing
+      joinQueue();
     });
 
     SocketService.on('onError', (err) => {
