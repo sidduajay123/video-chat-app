@@ -152,7 +152,7 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-    - host: video-chat.example.com    # Replace with your domain
+    - host: omeglefun.work.gd    # Replace with your domain
       http:
         paths:
           - path: /
