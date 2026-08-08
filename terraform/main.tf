@@ -27,8 +27,7 @@ data "aws_subnets" "default" {
 
 # ─── Security Groups ──────────────────────────────────────────────────────────
 data "aws_security_group" "eks_node_sg" {
-  name   = "video-chat-node-sg"
-  vpc_id = data.aws_vpc.default.id
+  id = "sg-0d2a002458cf35ded"
 }
 
 # ─── IAM Roles for EKS ─────────────────────────────────────────────────────────
