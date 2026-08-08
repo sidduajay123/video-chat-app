@@ -126,22 +126,17 @@ describe('Socket.IO: Queue & Matching', () => {
     });
   }, 10000);
 
-  test('same gender users do NOT get matched', (done) => {
+  test('same-gender users get matched as fallback', (done) => {
     const male1 = Client(clientUrl, { transports: ['websocket'] });
     const male2 = Client(clientUrl, { transports: ['websocket'] });
-    let queuedCount = 0;
     let matchedCount = 0;
 
-    const onQueued = () => {
-      queuedCount++;
-      if (queuedCount === 2) {
-        // Give time to check no match
-        setTimeout(() => {
-          expect(matchedCount).toBe(0);
-          male1.disconnect();
-          male2.disconnect();
-          done();
-        }, 500);
+    const onMatch = () => {
+      matchedCount++;
+      if (matchedCount === 2) {
+        male1.disconnect();
+        male2.disconnect();
+        done();
       }
     };
 
@@ -149,13 +144,14 @@ describe('Socket.IO: Queue & Matching', () => {
       male1.emit('join-queue', { gender: 'male', mode: 'video', location: {} });
     });
     male2.on('connect', () => {
-      male2.emit('join-queue', { gender: 'male', mode: 'video', location: {} });
+      // Small delay to ensure queue ordering is stable
+      setTimeout(() => {
+        male2.emit('join-queue', { gender: 'male', mode: 'video', location: {} });
+      }, 100);
     });
 
-    male1.on('queued', onQueued);
-    male2.on('queued', onQueued);
-    male1.on('matched', () => matchedCount++);
-    male2.on('matched', () => matchedCount++);
+    male1.on('matched', onMatch);
+    male2.on('matched', onMatch);
   }, 10000);
 
   test('peer-left emitted when a user disconnects from a room', (done) => {
