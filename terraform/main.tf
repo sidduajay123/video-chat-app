@@ -226,6 +226,24 @@ resource "aws_eks_cluster" "video_chat_cluster" {
     endpoint_private_access = true
   }
 
+  compute_config {
+    enabled       = true
+    node_pools    = ["general-purpose", "system"]
+    node_role_arn = aws_iam_role.eks_node_role.arn
+  }
+
+  storage_config {
+    block_storage {
+      enabled = true
+    }
+  }
+
+  kubernetes_networking_config {
+    elastic_load_balancing {
+      enabled = true
+    }
+  }
+
   depends_on = [
     aws_iam_role_policy_attachment.eks_cluster_policy
   ]
