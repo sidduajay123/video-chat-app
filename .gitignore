@@ -1,12 +1,19 @@
+# Node
 node_modules/
-package-lock.json
-coverage/
+npm-debug.log
+
+# Terraform
+terraform/.terraform/
+terraform/.terraform.lock.hcl
+terraform/errored.tfstate
+terraform/*.tfplan
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
+
+# Environment
 .env
-.env.*
-*.log
-npm-debug.log*
+.env.local
+
+# OS
 .DS_Store
-.idea/
-.vscode/
-dist/
-build/
+coverage/

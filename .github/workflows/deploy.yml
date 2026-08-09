@@ -6,22 +6,33 @@ on:
   pull_request:
     branches: [ main ]
 
+env:
+  AWS_REGION: us-east-1
+  EKS_CLUSTER: video-chat-cluster
+  ECR_REPOSITORY: video-chat-app
+
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
+
     - name: Use Node.js
       uses: actions/setup-node@v3
       with:
-        node-version: '24'
-    - run: npm install
-    - run: npm test
+        node-version: '20'
+
+    - name: Install dependencies
+      run: npm install
+
+    - name: Run tests
+      run: npm test
 
   build-and-deploy:
     needs: test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+
     steps:
     - uses: actions/checkout@v3
 
@@ -30,61 +41,123 @@ jobs:
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: us-east-1
+        aws-region: ${{ env.AWS_REGION }}
 
+    # ─── Terraform ─────────────────────────────────────────────────────────────
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v2
       with:
-        terraform_version: 1.5.0
+        terraform_version: 1.5.7
 
-    - name: Terraform Init & Apply
-      run: |
-        terraform init
-        terraform apply -auto-approve
+    - name: Terraform Init
+      run: terraform init
       working-directory: ./terraform
 
+    - name: Import existing AWS resources into Terraform state (idempotent)
+      working-directory: ./terraform
+      run: |
+        # Import EKS cluster if not already tracked
+        terraform state show aws_eks_cluster.video_chat_cluster > /dev/null 2>&1 || \
+          terraform import aws_eks_cluster.video_chat_cluster video-chat-cluster || true
+
+        # Import EKS node group if not already tracked
+        terraform state show aws_eks_node_group.video_chat_nodes > /dev/null 2>&1 || \
+          terraform import aws_eks_node_group.video_chat_nodes video-chat-cluster:video-chat-nodes || true
+
+    - name: Terraform Plan
+      run: terraform plan -no-color
+      working-directory: ./terraform
+
+    - name: Terraform Apply
+      run: terraform apply -auto-approve
+      working-directory: ./terraform
+
+    # ─── Docker Build & Push ───────────────────────────────────────────────────
     - name: Login to Amazon ECR
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v1
 
     - name: Create ECR Repository if not exists
       run: |
-        aws ecr describe-repositories --repository-names video-chat-app || \
-        aws ecr create-repository --repository-name video-chat-app
+        aws ecr describe-repositories --repository-names $ECR_REPOSITORY \
+          --region $AWS_REGION 2>/dev/null || \
+          aws ecr create-repository --repository-name $ECR_REPOSITORY \
+          --region $AWS_REGION
 
     - name: Build, tag, and push image to Amazon ECR
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        ECR_REPOSITORY: video-chat-app
         IMAGE_TAG: ${{ github.sha }}
       run: |
-        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
+        docker build \
+          -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+          -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+        echo "IMAGE=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_ENV
 
-    - name: Update kubeconfig & Deploy to EKS
+    # ─── Deploy to EKS ────────────────────────────────────────────────────────
+    - name: Install kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: 'v1.28.0'
+
+    - name: Update kubeconfig
+      run: aws eks update-kubeconfig --name $EKS_CLUSTER --region $AWS_REGION
+
+    - name: Deploy to EKS
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        ECR_REPOSITORY: video-chat-app
         IMAGE_TAG: ${{ github.sha }}
       run: |
-        aws eks update-kubeconfig --name video-chat-cluster --region us-east-1
-        sed -i "s|sidduajay123/video-chat-app:latest|$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG|g" k8s/deployment.yaml
+        # Replace image in deployment.yaml with new ECR image
+        sed -i "s|image:.*video-chat-app.*|image: $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG|g" k8s/deployment.yaml
         kubectl apply -f k8s/deployment.yaml
         kubectl rollout restart deployment/video-chat-app -n video-chat
         kubectl rollout status deployment/video-chat-app -n video-chat --timeout=180s
 
-    - name: Dynamically Register EKS Nodes with Load Balancer
+    # ─── ELB Node Registration ────────────────────────────────────────────────
+    - name: Register EKS nodes with Load Balancer
       run: |
-        ELB_HOST=$(kubectl get svc video-chat-service -n video-chat -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)
-        if [ -n "$ELB_HOST" ]; then
-          ELB_NAME=$(echo "$ELB_HOST" | cut -d'-' -f1)
-          NODES=$(kubectl get nodes -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || true)
-          if [ -n "$NODES" ] && [ -n "$ELB_NAME" ]; then
-            echo "Registering nodes ($NODES) with ELB ($ELB_NAME)..."
-            aws elb register-instances-with-load-balancer \
-              --load-balancer-name "$ELB_NAME" \
-              --instances $NODES \
-              --region us-east-1 || true
+        ELB_HOST=$(kubectl get svc video-chat-service -n video-chat \
+          -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)
+
+        if [ -z "$ELB_HOST" ]; then
+          echo "No ELB hostname found yet, skipping node registration."
+          exit 0
+        fi
+
+        ELB_NAME=$(echo "$ELB_HOST" | awk -F'-' '{print $1}')
+        echo "ELB Name: $ELB_NAME"
+
+        # Get EC2 instance IDs (not node DNS names) via AWS API
+        NODE_DNS_NAMES=$(kubectl get nodes \
+          -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || true)
+
+        if [ -z "$NODE_DNS_NAMES" ]; then
+          echo "No nodes found, skipping."
+          exit 0
+        fi
+
+        INSTANCE_IDS=""
+        for DNS in $NODE_DNS_NAMES; do
+          ID=$(aws ec2 describe-instances \
+            --region $AWS_REGION \
+            --filters "Name=private-dns-name,Values=$DNS" \
+            --query "Reservations[].Instances[].InstanceId" \
+            --output text)
+          if [ -n "$ID" ] && [ "$ID" != "None" ]; then
+            INSTANCE_IDS="$INSTANCE_IDS $ID"
           fi
+        done
+
+        INSTANCE_IDS=$(echo "$INSTANCE_IDS" | xargs)
+        if [ -n "$INSTANCE_IDS" ]; then
+          echo "Registering instances: $INSTANCE_IDS with ELB: $ELB_NAME"
+          aws elb register-instances-with-load-balancer \
+            --load-balancer-name "$ELB_NAME" \
+            --instances $INSTANCE_IDS \
+            --region $AWS_REGION || true
+        else
+          echo "No valid instance IDs found, skipping registration."
         fi

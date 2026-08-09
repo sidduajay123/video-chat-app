@@ -23,9 +23,7 @@ output "ecr_repository_url" {
   description = "URL of the Amazon ECR Docker repository"
 }
 
-
-
 output "security_group_id" {
-  value       = aws_security_group.eks_node_sg.id
+  value       = local.eks_sg_id
   description = "Security Group ID for EKS nodes"
 }

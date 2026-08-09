@@ -30,8 +30,41 @@ data "aws_subnets" "default" {
   }
 }
 
-# ─── Security Groups ──────────────────────────────────────────────────────────
+# ─── IAM Roles (existing) ──────────────────────────────────────────────────────
+data "aws_iam_role" "eks_cluster_role" {
+  name = "EKS-Cluster-Role"
+}
+
+data "aws_iam_role" "eks_node_role" {
+  name = "EKS-Node-Group-Role"
+}
+
+# ─── ECR Repository (existing) ────────────────────────────────────────────────
+data "aws_ecr_repository" "app_repo" {
+  name = "video-chat-app"
+}
+
+# ─── Security Group for EKS nodes ─────────────────────────────────────────────
+# Use existing SG created by EKS cluster if it exists, otherwise create one
+data "aws_security_groups" "eks_cluster_sg" {
+  filter {
+    name   = "tag:aws:eks:cluster-name"
+    values = [var.cluster_name]
+  }
+  filter {
+    name   = "vpc-id"
+    values = [data.aws_vpc.default.id]
+  }
+}
+
+locals {
+  # Use the first existing EKS cluster SG if found, else fall back to our managed one
+  eks_sg_id = length(data.aws_security_groups.eks_cluster_sg.ids) > 0 ? data.aws_security_groups.eks_cluster_sg.ids[0] : aws_security_group.eks_node_sg[0].id
+}
+
+# Only create security group if no existing EKS cluster SG is found
 resource "aws_security_group" "eks_node_sg" {
+  count       = length(data.aws_security_groups.eks_cluster_sg.ids) > 0 ? 0 : 1
   name_prefix = "video-chat-node-sg-"
   description = "Security group for EKS worker nodes and load balancer access"
   vpc_id      = data.aws_vpc.default.id
@@ -85,24 +118,9 @@ resource "aws_security_group" "eks_node_sg" {
   }
 
   tags = {
-    Name                                        = "video-chat-node-sg"
-    Environment                                 = var.environment
-    "kubernetes.io/cluster/${var.cluster_name}" = "owned"
+    Name        = "video-chat-node-sg"
+    Environment = var.environment
   }
-}
-
-# ─── IAM Roles for EKS ─────────────────────────────────────────────────────────
-data "aws_iam_role" "eks_cluster_role" {
-  name = "EKS-Cluster-Role"
-}
-
-data "aws_iam_role" "eks_node_role" {
-  name = "EKS-Node-Group-Role"
-}
-
-# ─── ECR Repository ────────────────────────────────────────────────────────────
-data "aws_ecr_repository" "app_repo" {
-  name = "video-chat-app"
 }
 
 # ─── EKS Cluster ───────────────────────────────────────────────────────────────
@@ -111,8 +129,7 @@ resource "aws_eks_cluster" "video_chat_cluster" {
   role_arn = data.aws_iam_role.eks_cluster_role.arn
 
   vpc_config {
-    subnet_ids              = data.aws_subnets.default.ids
-    security_group_ids      = [aws_security_group.eks_node_sg.id]
+    subnet_ids             = data.aws_subnets.default.ids
     endpoint_public_access  = true
     endpoint_private_access = true
   }
@@ -120,6 +137,17 @@ resource "aws_eks_cluster" "video_chat_cluster" {
   tags = {
     Name        = var.cluster_name
     Environment = var.environment
+  }
+
+  lifecycle {
+    ignore_changes = [
+      # Ignore changes to vpc_config security groups as EKS manages its own cluster SG
+      vpc_config,
+      # Ignore kubernetes_network_config as it is set by AWS
+      kubernetes_network_config,
+      # Ignore version so we don't accidentally upgrade
+      version,
+    ]
   }
 }
 
@@ -148,6 +176,13 @@ resource "aws_eks_node_group" "video_chat_nodes" {
     Name        = "video-chat-nodes"
     Environment = var.environment
   }
+
+  lifecycle {
+    ignore_changes = [
+      # Ignore scaling_config.desired_size so autoscaler can manage it
+      scaling_config[0].desired_size,
+      # Ignore release_version to avoid rolling updates on every plan
+      release_version,
+    ]
+  }
 }
-
-
