@@ -45,26 +45,7 @@ data "aws_ecr_repository" "app_repo" {
 }
 
 # ─── Security Group for EKS nodes ─────────────────────────────────────────────
-# Use existing SG created by EKS cluster if it exists, otherwise create one
-data "aws_security_groups" "eks_cluster_sg" {
-  filter {
-    name   = "tag:aws:eks:cluster-name"
-    values = [var.cluster_name]
-  }
-  filter {
-    name   = "vpc-id"
-    values = [data.aws_vpc.default.id]
-  }
-}
-
-locals {
-  # Use the first existing EKS cluster SG if found, else fall back to our managed one
-  eks_sg_id = length(data.aws_security_groups.eks_cluster_sg.ids) > 0 ? data.aws_security_groups.eks_cluster_sg.ids[0] : aws_security_group.eks_node_sg[0].id
-}
-
-# Only create security group if no existing EKS cluster SG is found
 resource "aws_security_group" "eks_node_sg" {
-  count       = length(data.aws_security_groups.eks_cluster_sg.ids) > 0 ? 0 : 1
   name_prefix = "video-chat-node-sg-"
   description = "Security group for EKS worker nodes and load balancer access"
   vpc_id      = data.aws_vpc.default.id
@@ -118,18 +99,21 @@ resource "aws_security_group" "eks_node_sg" {
   }
 
   tags = {
-    Name        = "video-chat-node-sg"
-    Environment = var.environment
+    Name                                        = "video-chat-node-sg"
+    Environment                                 = var.environment
+    "kubernetes.io/cluster/${var.cluster_name}" = "owned"
   }
 }
 
 # ─── EKS Cluster ───────────────────────────────────────────────────────────────
 resource "aws_eks_cluster" "video_chat_cluster" {
-  name     = var.cluster_name
-  role_arn = data.aws_iam_role.eks_cluster_role.arn
+  name                          = var.cluster_name
+  role_arn                      = data.aws_iam_role.eks_cluster_role.arn
+  bootstrap_self_managed_addons = false
 
   vpc_config {
-    subnet_ids             = data.aws_subnets.default.ids
+    subnet_ids              = data.aws_subnets.default.ids
+    security_group_ids      = [aws_security_group.eks_node_sg.id]
     endpoint_public_access  = true
     endpoint_private_access = true
   }
@@ -141,8 +125,6 @@ resource "aws_eks_cluster" "video_chat_cluster" {
 
   lifecycle {
     ignore_changes = [
-      # Ignore changes to vpc_config security groups as EKS manages its own cluster SG
-      vpc_config,
       # Ignore kubernetes_network_config as it is set by AWS
       kubernetes_network_config,
       # Ignore version so we don't accidentally upgrade
