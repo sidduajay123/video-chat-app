@@ -35,6 +35,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+      with:
+        fetch-depth: 2
 
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v2
@@ -43,17 +45,39 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ env.AWS_REGION }}
 
-    # ─── Terraform ─────────────────────────────────────────────────────────────
+    # ─── Check for Infrastructure Changes ─────────────────────────────────────
+    - name: Check for Infrastructure Changes
+      id: check-changes
+      run: |
+        if git rev-parse HEAD~1 >/dev/null 2>&1; then
+          DIFF_FILES=$(git diff --name-only HEAD~1 HEAD)
+        else
+          DIFF_FILES=$(git show --name-only --format="" HEAD)
+        fi
+        echo "Files changed in this commit:"
+        echo "$DIFF_FILES"
+        
+        INFRA_CHANGED="false"
+        if echo "$DIFF_FILES" | grep -E '^(terraform/|.*\.tf$|.*\.hcl$)'; then
+          INFRA_CHANGED="true"
+        fi
+        echo "infra_changed=$INFRA_CHANGED"
+        echo "infra_changed=$INFRA_CHANGED" >> $GITHUB_OUTPUT
+
+    # ─── Setup Terraform (Conditional) ────────────────────────────────────────
     - name: Setup Terraform
+      if: steps.check-changes.outputs.infra_changed == 'true'
       uses: hashicorp/setup-terraform@v2
       with:
         terraform_version: 1.5.7
 
     - name: Terraform Init
+      if: steps.check-changes.outputs.infra_changed == 'true'
       run: terraform init
       working-directory: ./terraform
 
     - name: Import existing AWS resources into Terraform state (idempotent)
+      if: steps.check-changes.outputs.infra_changed == 'true'
       working-directory: ./terraform
       run: |
         # Import EKS cluster if not already tracked
@@ -65,14 +89,33 @@ jobs:
           terraform import aws_eks_node_group.video_chat_nodes video-chat-cluster:video-chat-nodes || true
 
     - name: Terraform Plan
-      run: terraform plan -no-color
+      if: steps.check-changes.outputs.infra_changed == 'true'
+      run: terraform plan -out=tfplan -no-color
       working-directory: ./terraform
+
+    - name: Check for Destructive Changes
+      if: steps.check-changes.outputs.infra_changed == 'true'
+      working-directory: ./terraform
+      run: |
+        # Use terraform show -json to inspect proposed changes
+        PLAN_JSON=$(terraform show -json tfplan)
+        
+        # Parse proposed actions using jq. Look for "delete" actions
+        DESTRUCTIVE_COUNT=$(echo "$PLAN_JSON" | jq '[.resource_changes[]? | select(.change.actions[] | select(. == "delete"))] | length')
+        
+        echo "Found $DESTRUCTIVE_COUNT resource destruction(s) in plan."
+        
+        if [ "$DESTRUCTIVE_COUNT" -gt 0 ]; then
+          echo "::error::Destructive changes (resource deletion/replacement) detected in Terraform plan! Automated apply is blocked. Please review and apply manually."
+          exit 1
+        fi
 
     - name: Terraform Apply
-      run: terraform apply -auto-approve
+      if: steps.check-changes.outputs.infra_changed == 'true'
+      run: terraform apply -auto-approve tfplan
       working-directory: ./terraform
 
-    # ─── Docker Build & Push ───────────────────────────────────────────────────
+    # ─── Docker Build & Push (Always Runs) ──────────────────────────────────────
     - name: Login to Amazon ECR
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v1
@@ -96,7 +139,7 @@ jobs:
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
         echo "IMAGE=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_ENV
 
-    # ─── Deploy to EKS ────────────────────────────────────────────────────────
+    # ─── Deploy to EKS (Always Runs) ───────────────────────────────────────────
     - name: Install kubectl
       uses: azure/setup-kubectl@v3
       with:
@@ -116,7 +159,7 @@ jobs:
         kubectl rollout restart deployment/video-chat-app -n video-chat
         kubectl rollout status deployment/video-chat-app -n video-chat --timeout=180s
 
-    # ─── ELB Node Registration ────────────────────────────────────────────────
+    # ─── ELB Node Registration (Always Runs) ────────────────────────────────────
     - name: Register EKS nodes with Load Balancer
       run: |
         ELB_HOST=$(kubectl get svc video-chat-service -n video-chat \
